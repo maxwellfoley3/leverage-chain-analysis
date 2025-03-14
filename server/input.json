@@ -1,0 +1,8 @@
+{
+  "chainName": "ethereum",
+  "filterArgs": [
+    "?rankBy=trendingScoreH24&order=desc"
+  ],
+  "fromPage": 1,
+  "toPage": 1
+}
