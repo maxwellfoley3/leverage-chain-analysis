@@ -1,5 +1,12 @@
 const _ = require('lodash');
 const axios = require('axios');
+require('dotenv').config();
+const express = require('express');
+const app = express();
+const server = require('http').createServer();
+
+const port = 3000;
+
 function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
@@ -10,6 +17,7 @@ const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY
 async function fetchBuyersData(tokenAddress, tokenOriginAddress) {
 
     const response = await axios.get(`https://api.etherscan.io/api?module=account&action=tokentx&contractaddress=${tokenAddress}&address=${tokenOriginAddress}&startblock=0&endblock=27025780&sort=asc&apikey=${ETHERSCAN_API_KEY}`)
+    console.log('response', response.data.result, ETHERSCAN_API_KEY)
     const auctionResults = response.data.result.filter(d=> d.from.toLowerCase() === tokenOriginAddress.toLowerCase())
     
     const buyers = auctionResults.map(auctionResults=>auctionResults.to)
@@ -42,23 +50,9 @@ async function fetchTransactionsForBuyer(buyer, tokenAddress, tokenOriginAddress
     const newTransactions = response.data.result.filter(d=>d.from.toLowerCase() !== tokenOriginAddress.toLowerCase())
     return newTransactions
 }
-    /*transactions.push(...newTransactions)
-    console.log(newTransactions)
-        ws.send(JSON.stringify({ type: 'updateData', data: newTransactions, index: i }))
-}
-*/
-
-
-// Problems: auction data token numbers in sprreadsheet does not match a
-
-
-// filter by token holder 
-// https://etherscan.io/token/0x3e6a1b21bd267677fa49be6425aebe2fc0f89bde?a=0x0f190180861875d79b57700747377ddae8bd2570
-
-// go()
 
 const WebSocket = require('ws');
-const wss = new WebSocket.Server({ port: 3000 });
+const wss = new WebSocket.Server({ server });
 
 wss.on('connection', (ws) => {
     console.log('Client connected');
@@ -98,14 +92,14 @@ wss.on('connection', (ws) => {
     });
 });
 
-console.log('WebSocket server running on port 3000');
+/// serve static files
+app.use(express.static('../client/dist'));
 
-async function go() {
-    try {
-        await fetchData();
-    } catch (error) {
-        console.error('Error in go():', error);
-    }
-}
+server.on('request', app);
 
-go()
+server.listen(port, () => {
+    console.log(`Server is running on port ${port}`);
+});
+
+
+
