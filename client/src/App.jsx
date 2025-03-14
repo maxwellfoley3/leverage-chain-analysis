@@ -12,6 +12,7 @@ function truncateAddress(str) {
   return `${firstSix}...${lastFour}`;
 }
 
+const WS_URL = process.env.NODE_ENV === 'development' ? 'ws://localhost:3000' : 'wss://leverage-chain-analysis-production.up.railway.app'
 
 function App() {
   const [tokenAddress, setTokenAddress] = useState('0x3e6a1b21bd267677fa49be6425aebe2fc0f89bde')
@@ -118,7 +119,7 @@ function App() {
   }
 
   useEffect(() => {
-    const ws = new WebSocket('ws://localhost:3000')
+    const ws = new WebSocket(WS_URL)
 
     ws.onopen = () => {
       console.log('Connected to server')
@@ -275,7 +276,7 @@ function App() {
                                 </a>)}</td>
                           <td className="sold-icon">{secondaryTransactions?.length > 0 && secondaryTransactions.some(d=>d.from === to) ? <span>✅</span> : null}</td>
                           <td className="sell-events">{
-                          to && to.toLowerCase() === currentBuyerToFetch.to.toLowerCase()
+                          to && (to.toLowerCase() === currentBuyerToFetch.to.toLowerCase())
                           ?
                             <img className="loading" src="loading.gif" alt="Loading..." />
                           :

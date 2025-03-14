@@ -17,7 +17,6 @@ const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY
 async function fetchBuyersData(tokenAddress, tokenOriginAddress) {
 
     const response = await axios.get(`https://api.etherscan.io/api?module=account&action=tokentx&contractaddress=${tokenAddress}&address=${tokenOriginAddress}&startblock=0&endblock=27025780&sort=asc&apikey=${ETHERSCAN_API_KEY}`)
-    console.log('response', response.data.result, ETHERSCAN_API_KEY)
     const auctionResults = response.data.result.filter(d=> d.from.toLowerCase() === tokenOriginAddress.toLowerCase())
     
     const buyers = auctionResults.map(auctionResults=>auctionResults.to)
