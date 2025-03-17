@@ -27,13 +27,16 @@ function App() {
  
   const makeCsv = () => {
     const dataString = `
-    ,Buyer,Auction value,Auction txs,Sold after auction?,Post-auction values,Post-auction txs
+    ,Buyer,Auction value,Auction txs,Auction timestamps,Sold after auction?,Post-auction values,Post-auction txs,Post-auction timestamps
     ${buyers.map((b,i) => {
+      const auctionTimeStamps = b.timeStamps.map(t => new Date(t * 1000).toLocaleString().split(',')).join(' ')
       const soldAfterAuction = transactions[i]?.filter(t => t.from === b.to || t.to === b.to).length > 0
       const postAuctionTransactions = transactions[i]?.filter(t => t.from.toLowerCase() !== tokenOriginAddress.toLowerCase())
-      const postAuctionValueStrings = postAuctionTransactions?.map(t => t.to === b.to ? '+' + formatValue(t.value, b.tokenDecimal) : '-' + formatValue(t.value, b.tokenDecimal)).join(',')
-      const postAuctionTxStrings = postAuctionTransactions?.map(t => t.hash).join(',')
-      return `${i},${b.to},${formatValue(b.value, b.tokenDecimal)},${b.hashes.join(' ')},${soldAfterAuction ? 'true' : 'false'},${postAuctionValueStrings},${postAuctionTxStrings}`
+      const postAuctionValueStrings = postAuctionTransactions?.map(t => t.to === b.to ? '+' + formatValue(t.value, b.tokenDecimal) : '-' + formatValue(t.value, b.tokenDecimal)).join(' ')
+      const postAuctionTxStrings = postAuctionTransactions?.map(t => t.hash).join(' ')
+      const postAuctionTimeStamps = postAuctionTransactions?.map(t => new Date(t.timeStamp * 1000).toLocaleString().split(',')).join(' ')
+
+      return `${i},${b.to},${formatValue(b.value, b.tokenDecimal)},${b.hashes.join(' ')},${auctionTimeStamps},${soldAfterAuction ? 'true' : 'false'},${postAuctionValueStrings},${postAuctionTxStrings},${postAuctionTimeStamps}`
     }).join('\n')}
     `
     return dataString
@@ -256,14 +259,19 @@ function App() {
                     <td></td>
                     <td>Address</td>
                     <td>Auction events</td>
+                    <td>Auction timestamps</td>
                     <td>Sold?</td>
                     <td>Buy/sell events</td>
+                    <td>Buy/sell timestamps</td>
+                    <td>Total value</td>
                   </tr>
                 </thead>
                 <tbody>
-                  { buyers.length > 0 && buyers.map(({to,value,hashes, tokenSymbol, tokenDecimal },i)=>{
+                  { buyers.length > 0 && buyers.map(({to,value,hashes, timeStamps, tokenSymbol, tokenDecimal },i)=>{
                     const flatTransactions = transactions.flat()
                     const secondaryTransactions = flatTransactions?.filter(d=>d.from === to || d.to === to)
+                    const totalValue = BigInt(value) + secondaryTransactions?.reduce(
+                      (acc,d)=>acc + (d.from === to ? -1n : 1n) * BigInt(d.value), 0n)
                     return (
                         <tr key={i}>
                           <td>{i}</td>
@@ -274,9 +282,10 @@ function App() {
                             {hashes.length > 0 && hashes.map(hash => <a href={`https://etherscan.io/tx/${hash}`} target="_blank" rel="noopener noreferrer">  
                                   <img src ="open-in-new.svg" alt="open in new" />
                                 </a>)}</td>
+                          <td className="auction-timestamps">{timeStamps.map(t => <div className="timestamp">{new Date(t * 1000).toLocaleString()}</div>)}</td>
                           <td className="sold-icon">{secondaryTransactions?.length > 0 && secondaryTransactions.some(d=>d.from === to) ? <span>✅</span> : null}</td>
                           <td className="sell-events">{
-                          to && (to.toLowerCase() === currentBuyerToFetch.to.toLowerCase())
+                          to && currentBuyerToFetch && (to.toLowerCase() === currentBuyerToFetch.to.toLowerCase())
                           ?
                             <img className="loading" src="loading.gif" alt="Loading..." />
                           :
@@ -293,6 +302,8 @@ function App() {
                               </div>
                             )
                           })}</td>
+                          <td className="sell-timestamps">{secondaryTransactions && secondaryTransactions?.map(d=><div className="timestamp">{new Date(d.timeStamp * 1000).toLocaleString()}</div>)}</td>
+                          <td className="total-value">{i < currentBuyerToFetchIdx ? `${formatValue(totalValue, tokenDecimal)} ${tokenSymbol}` : ''}</td>
                         </tr>)
                       })}
                 </tbody>

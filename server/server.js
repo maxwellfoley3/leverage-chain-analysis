@@ -32,7 +32,9 @@ async function fetchBuyersData(tokenAddress, tokenOriginAddress) {
             numEvents++;
             return acc+BigInt(d.value) }
         ,0n)
-        return {to: buyer, value:String(amount), hashes: auctionResults.filter(d=>d.to.toLowerCase() === buyer.toLowerCase()).map(d=>d.hash), tokenSymbol: tokenSymbol, tokenDecimal: tokenDecimal}
+        const hashes = auctionResults.filter(d=>d.to.toLowerCase() === buyer.toLowerCase()).map(d=>d.hash)
+        const timeStamps = auctionResults.filter(d=>d.to.toLowerCase() === buyer.toLowerCase()).map(d=>d.timeStamp)
+        return {to: buyer, value:String(amount), hashes, timeStamps, tokenSymbol: tokenSymbol, tokenDecimal: tokenDecimal}
     })
 }
 
@@ -45,7 +47,6 @@ async function fetchTransactionsForBuyer(buyer, tokenAddress, tokenOriginAddress
         await sleep(1000)
         return fetchTransactionsForBuyer(buyer, tokenAddress, tokenOriginAddress)
     }
-    console.log('response', response.data.result)
     const newTransactions = response.data.result.filter(d=>d.from.toLowerCase() !== tokenOriginAddress.toLowerCase())
     return newTransactions
 }
