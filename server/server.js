@@ -16,9 +16,34 @@ const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY
 
 async function fetchBuyersData(tokenAddress, tokenOriginAddress) {
 
-    const response = await axios.get(`https://api.etherscan.io/api?module=account&action=tokentx&contractaddress=${tokenAddress}&address=${tokenOriginAddress}&startblock=0&endblock=27025780&sort=asc&apikey=${ETHERSCAN_API_KEY}`)
-    const auctionResults = response.data.result.filter(d=> d.from.toLowerCase() === tokenOriginAddress.toLowerCase())
+    const response = await axios.get(`https://api.etherscan.io/api?module=account&action=tokentx&contractaddress=${tokenAddress}&startblock=0&endblock=27025780&sort=asc&apikey=${ETHERSCAN_API_KEY}`)
+    const transactions = response.data.result //.filter(d=> d.from.toLowerCase() === tokenOriginAddress.toLowerCase())
+    const transactionsByBuyer = _.groupBy(transactions, 'to')
+
+    /*
+    const processedTransactionsByBuyer = Object.keys(transactionsByBuyer).map(buyer=>{
+        const transactions = transactionsByBuyer[buyer]
+        const auctionsTransactions = transactions.filter(d=>d.from.toLowerCase() === tokenOriginAddress.toLowerCase())
+        const postAuctionTransactions = transactions.filter(d=>d.from.toLowerCase() !== tokenOriginAddress.toLowerCase())
+        const amount = transactions.reduce((acc,d)=>acc+BigInt(d.value),0n)
+        return {auctionsAmount:String(auctionsAmount), amount:String(totalAmount)}
+    })*/
+
+    // sort by earliest transaction time
+    const sortedTransactionsByBuyer = Object.keys(transactionsByBuyer).map(buyer => {
+        const txs = transactionsByBuyer[buyer]
+        return txs.sort((a,b)=>a.timeStamp - b.timeStamp)
+    }).sort((a,b)=>{
+        //const aTransactions = transactionsByBuyer[a]
+        //const bTransactions = transactionsByBuyer[b]
+        return a[0].timeStamp - b[0].timeStamp
+    })
+
+    return sortedTransactionsByBuyer
     
+    /*
+    const onlyAuctionResults = auctionResults.filter(d=> d.from.toLowerCase() === tokenOriginAddress.toLowerCase())
+    console.log('auctionResults.length', auctionResults.length, 'onlyAuctionResults.length', onlyAuctionResults.length)
     const buyers = auctionResults.map(auctionResults=>auctionResults.to)
     const uniqueBuyers = [...new Set(buyers)]
 
@@ -27,15 +52,15 @@ async function fetchBuyersData(tokenAddress, tokenOriginAddress) {
 
     return uniqueBuyers.map(buyer=>{
         let numEvents = 0;
-        const amount = auctionResults.filter(d=>d.to.toLowerCase() === buyer.toLowerCase())
+        const amount = onlyAuctionResults.filter(d=>d.to.toLowerCase() === buyer.toLowerCase())
         .reduce((acc,d)=>{ 
             numEvents++;
             return acc+BigInt(d.value) }
         ,0n)
-        const hashes = auctionResults.filter(d=>d.to.toLowerCase() === buyer.toLowerCase()).map(d=>d.hash)
-        const timeStamps = auctionResults.filter(d=>d.to.toLowerCase() === buyer.toLowerCase()).map(d=>d.timeStamp)
+        const hashes = onlyAuctionResults.filter(d=>d.to.toLowerCase() === buyer.toLowerCase()).map(d=>d.hash)
+        const timeStamps = onlyAuctionResults.filter(d=>d.to.toLowerCase() === buyer.toLowerCase()).map(d=>d.timeStamp)
         return {to: buyer, value:String(amount), hashes, timeStamps, tokenSymbol: tokenSymbol, tokenDecimal: tokenDecimal}
-    })
+    })*/
 }
 
 let lastTransactionTime = Date.now()

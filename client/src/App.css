@@ -68,6 +68,10 @@ td.sell-events {
   text-align: right;
 }
 
+td.sell-events div {
+  height: 26px;
+}
+
 td.address {
   text-align: center;
 }
@@ -156,6 +160,7 @@ img.loading {
 .timestamp {
   font-size: 12px;
   color: #0009;
+  height: 26px;
 }
 
 

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import _ from 'lodash'
 import './App.css'
 
 function truncateAddress(str) {
@@ -21,22 +22,26 @@ function App() {
   const [message, setMessage] = useState('')
   const [buyers, setBuyers] = useState([])
   const [transactions, setTransactions] = useState([])
+  const [txData, setTxData] = useState([])
+  const [txDataBySeller, setTxDataBySeller] = useState([])
   const [currentBuyerToFetchIdx, setCurrentBuyerToFetchIdx] = useState(0)
   // running, paused, stopped
   const [mode, setMode] = useState('stopped')
  
   const makeCsv = () => {
     const dataString = `
-    ,Buyer,Auction value,Auction txs,Auction timestamps,Sold after auction?,Post-auction values,Post-auction txs,Post-auction timestamps
-    ${buyers.map((b,i) => {
-      const auctionTimeStamps = b.timeStamps.map(t => new Date(t * 1000).toLocaleString().split(',')).join(' ')
-      const soldAfterAuction = transactions[i]?.filter(t => t.from === b.to || t.to === b.to).length > 0
-      const postAuctionTransactions = transactions[i]?.filter(t => t.from.toLowerCase() !== tokenOriginAddress.toLowerCase())
-      const postAuctionValueStrings = postAuctionTransactions?.map(t => t.to === b.to ? '+' + formatValue(t.value, b.tokenDecimal) : '-' + formatValue(t.value, b.tokenDecimal)).join(' ')
-      const postAuctionTxStrings = postAuctionTransactions?.map(t => t.hash).join(' ')
-      const postAuctionTimeStamps = postAuctionTransactions?.map(t => new Date(t.timeStamp * 1000).toLocaleString().split(',')).join(' ')
+    ,Buyer,Auction value,Auction txs,Auction timestamps,Post-auction values,Post-auction txs,Post-auction timestamps,Total value
+    ${txData.map((txs,i) => {
+      const to = txs[0].to
+      const auctionsTransactions = txs.filter(d=>d.from.toLowerCase() === tokenOriginAddress.toLowerCase())
+      const auctionsAmount = txs.filter(d=>d.from.toLowerCase() === tokenOriginAddress.toLowerCase()).reduce((acc,d)=>acc+BigInt(d.value),0n)
+      const secondaryReceivingTransactions = txs.filter(d=>d.from.toLowerCase() !== tokenOriginAddress.toLowerCase())
+      const receivingAmount = secondaryReceivingTransactions.reduce((acc,d)=>acc+BigInt(d.value),0n)
+      const secondarySellingTransactions = txDataBySeller[to] ? txDataBySeller[to] : []
+      const sellingAmount = secondarySellingTransactions.reduce((acc,d)=>acc+BigInt(d.value),0n)
+      const amount = auctionsAmount + receivingAmount - sellingAmount
 
-      return `${i},${b.to},${formatValue(b.value, b.tokenDecimal)},${b.hashes.join(' ')},${auctionTimeStamps},${soldAfterAuction ? 'true' : 'false'},${postAuctionValueStrings},${postAuctionTxStrings},${postAuctionTimeStamps}`
+      return `${i},${to},${formatValue(auctionsAmount, txs[0].tokenDecimal)},${auctionsTransactions.map(t => t.hash).join(' ')},${auctionsTransactions.map(t => new Date(t.timeStamp * 1000).toLocaleString().split(',').join(' ')).join(' ')},${formatValue(receivingAmount, txs[0].tokenDecimal)},${secondaryReceivingTransactions.map(t => t.hash).join(' ')},${secondaryReceivingTransactions.map(t => new Date(t.timeStamp * 1000).toLocaleString().split(',').join(' ')).join(' ')},${formatValue(amount, txs[0].tokenDecimal)}`
     }).join('\n')}
     `
     return dataString
@@ -133,10 +138,17 @@ function App() {
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data)
       if (data.type === 'updateBuyers') {
-        setBuyers(data.data)
+        console.log('updateBuyers', data.data)
+        setTxData(data.data)
+        const flattenedTxData = data.data.flat()
+        const txDataBySeller = _.groupBy(flattenedTxData, 'from')
+        console.log('txDataBySeller', txDataBySeller)
+        setTxDataBySeller(txDataBySeller)
+        //setBuyers(data.data)
       }
 
       if (data.type === 'updateTransactions') {
+        console.log('updateTransactions', data.data)
         setTransactions(currentTransactions => {
           const newTransactions = [...currentTransactions, data.data]
           return newTransactions
@@ -222,10 +234,12 @@ function App() {
         <div className="header">
           <h1>Auction Analysis</h1>
           <div className="buttons">
+            {/*
             <button onClick={run} className={mode !== 'running' ? 'active' : 'inactive'}><img src="play.svg" alt="Play"></img></button>
             <button onClick={pause} className={mode === 'running' ? 'active' : 'inactive'}><img src="pause.svg" alt="Pause"></img></button>
             <button onClick={stop} className={mode !== 'stopped' ? 'active' : 'inactive'}><img src="stop.svg" alt="Stop"></img></button>
-          </div>
+          */}
+            </div>
           { message && <p>{message}</p> }
         </div>
         <div className="token-input">
@@ -251,7 +265,7 @@ function App() {
         <button onClick={() => downloadCsv()}>Download CSV</button>
         <div className="table-container">
           {
-            buyers.length > 0 ? (
+            txData.length > 0 ? (
           
             <table>
                 <thead>
@@ -260,30 +274,43 @@ function App() {
                     <td>Address</td>
                     <td>Auction events</td>
                     <td>Auction timestamps</td>
-                    <td>Sold?</td>
                     <td>Buy/sell events</td>
                     <td>Buy/sell timestamps</td>
                     <td>Total value</td>
                   </tr>
                 </thead>
                 <tbody>
-                  { buyers.length > 0 && buyers.map(({to,value,hashes, timeStamps, tokenSymbol, tokenDecimal },i)=>{
+                  { txData.length > 0 && txData.map((txs,i)=>{/*
                     const flatTransactions = transactions.flat()
                     const secondaryTransactions = flatTransactions?.filter(d=>d.from === to || d.to === to)
                     const totalValue = BigInt(value) + secondaryTransactions?.reduce(
-                      (acc,d)=>acc + (d.from === to ? -1n : 1n) * BigInt(d.value), 0n)
+                      (acc,d)=>acc + (d.from === to ? -1n : 1n) * BigInt(d.value), 0n)*/
+
+                    const to = txs[0].to
+                    const auctionsTransactions = txs.filter(d=>d.from.toLowerCase() === tokenOriginAddress.toLowerCase())
+                    const auctionsAmount = txs.filter(d=>d.from.toLowerCase() === tokenOriginAddress.toLowerCase()).reduce((acc,d)=>acc+BigInt(d.value),0n)
+                    const secondaryReceivingTransactions = txs.filter(d=>d.from.toLowerCase() !== tokenOriginAddress.toLowerCase())
+                    const receivingAmount = secondaryReceivingTransactions.reduce((acc,d)=>acc+BigInt(d.value),0n)
+                    const secondarySellingTransactions = txDataBySeller[to] ? txDataBySeller[to] : []
+                    const sellingAmount = secondarySellingTransactions.reduce((acc,d)=>acc+BigInt(d.value),0n)
+                    const secondaryTransactions = [...secondaryReceivingTransactions, ...secondarySellingTransactions].sort((a,b)=>a.timeStamp - b.timeStamp)
+                    const amount = auctionsAmount + receivingAmount - sellingAmount
+
+                    const tokenDecimal = txs[0].tokenDecimal
+                    const tokenSymbol = txs[0].tokenSymbol
+                    
+
                     return (
                         <tr key={i}>
                           <td>{i}</td>
                           <td className="address">
-                            <a href={`https://etherscan.io/address/${to}`} target="_blank" rel="noopener noreferrer">{truncateAddress(to)}</a>
+                            <a href={`https://etherscan.io/address/${txs[0].to}`} target="_blank" rel="noopener noreferrer">{truncateAddress(txs[0].to)}</a>
                           </td>
-                          <td className="buy-events">{String(BigInt(value) / (10n**BigInt(tokenDecimal)))} {tokenSymbol} 
-                            {hashes.length > 0 && hashes.map(hash => <a href={`https://etherscan.io/tx/${hash}`} target="_blank" rel="noopener noreferrer">  
+                          <td className="buy-events">{String(BigInt(auctionsAmount) / (10n**BigInt(tokenDecimal)))} {tokenSymbol} 
+                            {auctionsTransactions.length > 0 && auctionsTransactions.map(tx => <a href={`https://etherscan.io/tx/${tx.hash}`} target="_blank" rel="noopener noreferrer">  
                                   <img src ="open-in-new.svg" alt="open in new" />
                                 </a>)}</td>
-                          <td className="auction-timestamps">{timeStamps.map(t => <div className="timestamp">{new Date(t * 1000).toLocaleString()}</div>)}</td>
-                          <td className="sold-icon">{secondaryTransactions?.length > 0 && secondaryTransactions.some(d=>d.from === to) ? <span>✅</span> : null}</td>
+                          <td className="auction-timestamps">{auctionsTransactions.map(tx => <div className="timestamp">{new Date(tx.timeStamp * 1000).toLocaleString()}</div>)}</td>
                           <td className="sell-events">{
                           to && currentBuyerToFetch && (to.toLowerCase() === currentBuyerToFetch.to.toLowerCase())
                           ?
@@ -292,7 +319,7 @@ function App() {
                           secondaryTransactions?.map(({hash,value, from},j) => {
                             return (
                               <div key={j}>
-                                <span style={{ color: from === to ? 'red' : 'green' }}>
+                                <span style={{ color: from.toLowerCase() === to.toLowerCase() ? 'red' : 'green' }}>
                                   {formatValue(value, tokenDecimal)} 
                                 </span>
                                   &nbsp;{tokenSymbol}
@@ -303,7 +330,7 @@ function App() {
                             )
                           })}</td>
                           <td className="sell-timestamps">{secondaryTransactions && secondaryTransactions?.map(d=><div className="timestamp">{new Date(d.timeStamp * 1000).toLocaleString()}</div>)}</td>
-                          <td className="total-value">{i < currentBuyerToFetchIdx ? `${formatValue(totalValue, tokenDecimal)} ${tokenSymbol}` : ''}</td>
+                          <td className="total-value">{`${formatValue(amount, tokenDecimal)} ${tokenSymbol}`}</td>
                         </tr>)
                       })}
                 </tbody>
