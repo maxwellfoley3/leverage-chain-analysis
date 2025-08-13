@@ -31,3 +31,4 @@ Wallet type
 I think this is slightly more than an MVP. If we decide to go ahead, we should define the MVP specifically, I believe the whole thing should be "easy" in the sense that any step that requires a lot of thought ("what buying and selling behavior defines a person who believes in the token but who is moderately disposed to despair?") will be able to be skipped or simplified.
 
 https://docs.google.com/spreadsheets/d/1X3abfL4uvVUT-GieNvoP8jnd0ICFuBeo7ROtU2Amv6Y/edit?gid=1530656338#gid=1530656338
+
