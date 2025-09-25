@@ -17,19 +17,18 @@ const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY
 async function fetchBuyersData(tokenAddress, tokenOriginAddress) {
     let allTransactions = [];
     const blockRangeSize = 500000;
-    let currentStartBlock = 21336600;
 
-    console.log(`Starting to fetch transactions for token ${tokenAddress} with block pagination (500,000 blocks per request)...`);
+    console.log(`Starting to fetch transactions for token ${tokenAddress} with backward pagination (500,000 blocks per request)...`);
 
     // Get the latest block number
-    let maxBlock;
+    let latestBlock;
     try {
         console.log('Fetching latest block number...');
         const blockResponse = await axios.get(`https://api.etherscan.io/api?module=proxy&action=eth_blockNumber&apikey=${ETHERSCAN_API_KEY}`);
         
         // Convert hex to decimal
-        maxBlock = parseInt(blockResponse.data.result, 16);
-        console.log(`Latest block number: ${maxBlock}`);
+        latestBlock = parseInt(blockResponse.data.result, 16);
+        console.log(`Latest block number: ${latestBlock}`);
         
     } catch (error) {
         console.error('Error fetching latest block number:', error.message);
@@ -39,8 +38,8 @@ async function fetchBuyersData(tokenAddress, tokenOriginAddress) {
             // Retry getting block number
             const blockResponse = await axios.get(`https://api.etherscan.io/api?module=proxy&action=eth_blockNumber&apikey=${ETHERSCAN_API_KEY}`);
             if (blockResponse.data.status === '1') {
-                maxBlock = parseInt(blockResponse.data.result, 16);
-                console.log(`Latest block number (retry): ${maxBlock}`);
+                latestBlock = parseInt(blockResponse.data.result, 16);
+                console.log(`Latest block number (retry): ${latestBlock}`);
             } else {
                 throw new Error(`Failed to get block number: ${blockResponse.data.message}`);
             }
@@ -49,27 +48,39 @@ async function fetchBuyersData(tokenAddress, tokenOriginAddress) {
         }
     }
 
-    while (currentStartBlock <= maxBlock) {
-        const currentEndBlock = Math.min(currentStartBlock + blockRangeSize - 1, maxBlock);
+    // Start from the latest block and work backwards
+    let currentEndBlock = latestBlock;
+    let consecutiveEmptyRanges = 0;
+    const maxConsecutiveEmpty = 2; // Stop after 2 consecutive empty ranges
+
+    while (currentEndBlock >= 0 && consecutiveEmptyRanges < maxConsecutiveEmpty) {
+        const currentStartBlock = Math.max(0, currentEndBlock - blockRangeSize + 1);
         
         try {
             console.log(`Fetching transactions from block ${currentStartBlock} to ${currentEndBlock}...`);
             const response = await axios.get(`https://api.etherscan.io/api?module=account&action=tokentx&contractaddress=${tokenAddress}&startblock=${currentStartBlock}&endblock=${currentEndBlock}&sort=asc&apikey=${ETHERSCAN_API_KEY}`);
             
-            if (response.data.status !== '1') {
-                console.log('response data', response.data);
-                throw new Error(`API Error: ${response.data.message}`);
+            if (response.data.message === "No transactions found") {
+                consecutiveEmptyRanges++;
+                console.log(`No transactions found in blocks ${currentStartBlock}-${currentEndBlock}. Empty ranges: ${consecutiveEmptyRanges}`);
+            } else { 
+                const blockTransactions = response.data.result || [];
+                
+                if (blockTransactions.length === 0) {
+                    consecutiveEmptyRanges++;
+                    console.log(`No transactions found in blocks ${currentStartBlock}-${currentEndBlock}. Empty ranges: ${consecutiveEmptyRanges}`);
+                } else {
+                    consecutiveEmptyRanges = 0; // Reset counter when we find transactions
+                    allTransactions = allTransactions.concat(blockTransactions);
+                    console.log(`Fetched ${blockTransactions.length} transactions from blocks ${currentStartBlock}-${currentEndBlock}. Total so far: ${allTransactions.length}`);
+                }
             }
             
-            const blockTransactions = response.data.result || [];
-            allTransactions = allTransactions.concat(blockTransactions);
-            console.log(`Fetched ${blockTransactions.length} transactions from blocks ${currentStartBlock}-${currentEndBlock}. Total so far: ${allTransactions.length}`);
-            
-            // Move to next block range
-            currentStartBlock = currentEndBlock + 1;
+            // Move to previous block range
+            currentEndBlock = currentStartBlock - 1;
             
             // Wait 1 second between requests
-            if (currentStartBlock <= maxBlock) {
+            if (currentEndBlock >= 0) {
                 await sleep(1000);
             }
             
@@ -84,6 +95,12 @@ async function fetchBuyersData(tokenAddress, tokenOriginAddress) {
                 throw error;
             }
         }
+    }
+
+    if (consecutiveEmptyRanges >= maxConsecutiveEmpty) {
+        console.log(`Stopped pagination after ${maxConsecutiveEmpty} consecutive empty ranges`);
+    } else {
+        console.log('Reached block 0, stopping pagination');
     }
 
     console.log(`Finished fetching all transactions. Total: ${allTransactions.length}`);
