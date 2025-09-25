@@ -27,6 +27,7 @@ function App() {
   const [currentBuyerToFetchIdx, setCurrentBuyerToFetchIdx] = useState(0)
   // running, paused, stopped
   const [mode, setMode] = useState('stopped')
+  const [isLoadingBuyersData, setIsLoadingBuyersData] = useState(false)
  
   const makeCsv = () => {
     const dataString = `
@@ -144,6 +145,7 @@ function App() {
         const txDataBySeller = _.groupBy(flattenedTxData, 'from')
         console.log('txDataBySeller', txDataBySeller)
         setTxDataBySeller(txDataBySeller)
+        setIsLoadingBuyersData(false) // Stop loading when buyers data is received
         //setBuyers(data.data)
       }
 
@@ -154,6 +156,12 @@ function App() {
           return newTransactions
         })
         setCurrentBuyerToFetchIdx(_currentBuyerToFetchIdx => _currentBuyerToFetchIdx + 1)
+      }
+
+      if (data.error) {
+        console.error('WebSocket error:', data.error)
+        setIsLoadingBuyersData(false) // Stop loading on error
+        setMessage(`Error: ${data.error}`)
       }
     }
 
@@ -186,13 +194,18 @@ function App() {
 
   const fetchBuyersData = () => {
     setMode('running')
+    setIsLoadingBuyersData(true) // Start loading
+    setMessage('Fetching buyers data...')
+    
     if (tokenAddress.length !== 42 || tokenAddress.slice(0,2) !== '0x' || !/^0x[0-9a-fA-F]{40}$/.test(tokenAddress)) {
       alert('Invalid token address')
+      setIsLoadingBuyersData(false)
       return
     }
 
     if (tokenOriginAddress.length !== 42 || tokenOriginAddress.slice(0,2) !== '0x' || !/^0x[0-9a-fA-F]{40}$/.test(tokenOriginAddress)) {
       alert('Invalid token origin address')
+      setIsLoadingBuyersData(false)
       return
     }
 
@@ -213,6 +226,7 @@ function App() {
     setTokenAddress('')
     setTokenOriginAddress('')
     setMessage('')
+    setIsLoadingBuyersData(false)
     localStorage.removeItem(`progress`)
   }
 
@@ -258,9 +272,19 @@ function App() {
               <a onClick={setAddressesToYuge}><img src="yuge.png" alt="yuge" /></a>
               <a onClick={setAddressesToHydra}><img src="hydra.png" alt="hydra" /></a>
             </div>
-            <button onClick={() => fetchBuyersData()}>Fetch Data</button>
+            <button onClick={() => fetchBuyersData()} disabled={isLoadingBuyersData}>
+              {isLoadingBuyersData ? 'Fetching Data...' : 'Fetch Data'}
+            </button>
           </div>
         </div>
+        
+        {isLoadingBuyersData && (
+          <div className="loading-container">
+            <img className="loading-spinner" src="loading.gif" alt="Loading..." />
+            <p>Fetching buyers data from blockchain... This may take a few minutes.</p>
+          </div>
+        )}
+        
         { currentBuyerToFetch && <p>Fetching transactions for {currentBuyerToFetch.to}</p> }
         <button onClick={() => downloadCsv()}>Download CSV</button>
         <div className="table-container">
@@ -345,3 +369,4 @@ function App() {
 }
 
 export default App
+

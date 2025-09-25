@@ -163,4 +163,28 @@ img.loading {
   height: 26px;
 }
 
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  background-color: #f6f0f0;
+  border-radius: 15px;
+  margin: 20px 0;
+}
+
+.loading-spinner {
+  width: 80px;
+  height: 80px;
+  margin-bottom: 20px;
+}
+
+.loading-container p {
+  font-size: 16px;
+  color: #333;
+  text-align: center;
+  margin: 0;
+}
+
 
